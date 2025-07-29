@@ -11,15 +11,11 @@ Circle & Color Detector – GUI Version (完整)
 import sys
 import time
 from typing import List
+from pathlib import Path
 
 import cv2
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
-
-from PyQt5.QtGui import QIcon
-
-import sys, os
-from pathlib import Path
 from PyQt5.QtGui import QIcon
 
 def resource_path(rel):
@@ -36,6 +32,8 @@ BLUE_LOWER = np.array([66, 69, 77], dtype=np.uint8)
 BLUE_UPPER = np.array([128, 203, 199], dtype=np.uint8)
 BLACK_S_MAX = 140
 BLACK_V_MAX = 85
+BLACK_LOWER = np.array([0, 0, 0], dtype=np.uint8)
+BLACK_UPPER = np.array([180, BLACK_S_MAX, BLACK_V_MAX], dtype=np.uint8)
 MIN_AREA, MAX_AREA = 500, 120_000
 MIN_CIRCULARITY = 0.78
 ROI_RATIO = 0.5
@@ -150,11 +148,9 @@ class MainWindow(QtWidgets.QWidget):
 
         # ❷ 可选：窗口关闭后自动销毁，方便下次重新创建
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        super().__init__()
         self.setWindowTitle("GUI")
         self.resize(1200, 720)
         self.fps = 0.0
-        self.mask_win = None
 
         # 布局
         hbox = QtWidgets.QHBoxLayout(self)
@@ -244,19 +240,19 @@ class MainWindow(QtWidgets.QWidget):
     # ---------- HSV 黑色同步 ----------
     def sync_black_hsv(self):
         """把滑块数值同步到全局黑色 HSV 阈值"""
-        global BLACK_S_MAX, BLACK_V_MAX
-        BLACK_LOWER = np.array([
+        global BLACK_S_MAX, BLACK_V_MAX, BLACK_LOWER, BLACK_UPPER
+        BLACK_S_MAX = self.black_sliders["maxS_B"].value()
+        BLACK_V_MAX = self.black_sliders["maxV_B"].value()
+        BLACK_LOWER[:] = [
             self.black_sliders["minH_B"].value(),
             self.black_sliders["minS_B"].value(),
             self.black_sliders["minV_B"].value(),
-        ], dtype=np.uint8)
-        BLACK_UPPER = np.array([
+        ]
+        BLACK_UPPER[:] = [
             self.black_sliders["maxH_B"].value(),
             self.black_sliders["maxS_B"].value(),
             self.black_sliders["maxV_B"].value(),
-        ], dtype=np.uint8)
-        BLACK_S_MAX = self.black_sliders["maxS_B"].value()
-        BLACK_V_MAX = self.black_sliders["maxV_B"].value()
+        ]
 
     # ---------- 掩膜窗口 ----------
     # def toggle_mask(self):
@@ -319,9 +315,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # 黑色掩膜：H 不需要管，S/V 只看“最大值”
         if getattr(self, 'mask_win_black', None) and self.mask_win_black.isVisible():
-            lower_b = np.array([0,   0,   0],   dtype=np.uint8)
-            upper_b = np.array([180, BLACK_S_MAX, BLACK_V_MAX], dtype=np.uint8)
-            mask_black = cv2.inRange(hsv, lower_b, upper_b)
+            mask_black = cv2.inRange(hsv, BLACK_LOWER, BLACK_UPPER)
             self.mask_win_black.update_mask(mask_black)
 
 
@@ -344,8 +338,8 @@ class MainWindow(QtWidgets.QWidget):
 
 def main():
     icon_path = resource_path("Camera.ico")
-    app.setWindowIcon(QIcon(icon_path))
     app = QtWidgets.QApplication(sys.argv)
+    app.setWindowIcon(QIcon(icon_path))
     win = MainWindow()
     win.show()
     sys.exit(app.exec_())
